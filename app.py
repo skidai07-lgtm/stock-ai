@@ -83,6 +83,17 @@ if st.button("AI 분석 시작하기", use_container_width=True, type="primary")
                 st.error(f"데이터 연동 실패: {e}")
                 st.stop()
                 
+        with st.spinner("최근 1년 주가 차트 생성 중..."):
+            try:
+                import datetime
+                start_date = (datetime.datetime.now() - datetime.timedelta(days=365)).strftime('%Y-%m-%d')
+                df_chart = fdr.DataReader(ticker, start_date)
+                if not df_chart.empty:
+                    st.subheader("📉 최근 1년 주가 흐름")
+                    st.line_chart(df_chart['Close'], use_container_width=True)
+            except Exception as e:
+                pass # 차트 실패시 그냥 넘어감
+                
         with st.spinner("AI(Gemini)가 업황과 해외매출 가능성 등을 분석 중입니다... (10~20초 소요)"):
             try:
                 analyzer = StockAnalyzer(gemini_api_key)

@@ -41,6 +41,16 @@ class NaverFinanceApi:
             low52 = soup.select_one('.rwidth tbody tr:nth-of-type(2) td em:nth-of-type(2)')
             if high52 and low52: data['52주최고최저'] = f"{high52.text} / {low52.text}"
             
+            # 동일업종 PER (경쟁사 대비 고평가/저평가 판단용)
+            industry_per = soup.select_one('table.summary_info tr:nth-of-type(6) td em')
+            if not industry_per:
+                industry_per = soup.select_one('#_cmp_per')
+            if industry_per: data['동일업종PER'] = industry_per.text
+            
+            # 배당수익률
+            div_em = soup.select_one('#_dvr')
+            if div_em: data['배당수익률'] = div_em.text
+
             # 최근 뉴스 헤드라인 추출 (수주, 호재, 악재 파악용)
             news_list = []
             news_tags = soup.select('.news_section ul.spt_con li a.tit')

@@ -19,7 +19,9 @@ class StockAnalyzer:
 [재무 및 수급 데이터]
 - 현재가: {stock_data.get('현재가')} 원 (52주 최고/최저: {stock_data.get('52주최고최저', 'N/A')})
 - 시가총액: {stock_data.get('시가총액')} 억원
-- PER / PBR / EPS: {stock_data.get('PER')} / {stock_data.get('PBR')} / {stock_data.get('EPS')}원
+- 해당 종목 PER: {stock_data.get('PER')} (참고: 동일업종 평균 PER은 {stock_data.get('동일업종PER', 'N/A')} 입니다.)
+- PBR / EPS: {stock_data.get('PBR')} / {stock_data.get('EPS')}원
+- 배당수익률: {stock_data.get('배당수익률', 'N/A')}%
 - 외국인 지분율: {stock_data.get('외국인소진율', 'N/A')}
 
 [최근 주요 뉴스 헤드라인]
