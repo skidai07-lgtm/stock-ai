@@ -1,4 +1,4 @@
-pykrx
+finance-datareader
 requests
 pandas
 google-genai

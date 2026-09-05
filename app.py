@@ -1,7 +1,7 @@
 import streamlit as st
 import os
 from dotenv import load_dotenv
-from pykrx import stock
+import FinanceDataReader as fdr
 from naver_api import NaverFinanceApi
 from analyzer import StockAnalyzer
 
@@ -31,16 +31,14 @@ with st.sidebar:
     예: `http://192.168.0.x:8501`
     """)
 
-# Cache ticker mapping to avoid pykrx slow lookup every time
+# Cache ticker mapping to avoid slow lookup every time
 @st.cache_data(ttl=3600*24)
 def get_all_tickers():
     mapping = {}
-    with st.spinner("최초 1회 주식 종목 코드를 불러오는 중입니다 (약 10초 소요)..."):
-        for market in ["KOSPI", "KOSDAQ"]:
-            tickers = stock.get_market_ticker_list(market=market)
-            for ticker in tickers:
-                name = stock.get_market_ticker_name(ticker)
-                mapping[name] = ticker
+    with st.spinner("최초 1회 주식 종목 코드를 불러오는 중입니다 (약 5초 소요)..."):
+        df_krx = fdr.StockListing('KRX')
+        for idx, row in df_krx.iterrows():
+            mapping[row['Name']] = row['Code']
     return mapping
 
 ticker_dict = get_all_tickers()
