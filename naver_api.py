@@ -58,6 +58,34 @@ class NaverFinanceApi:
                 news_list.append(tag.text.strip())
             data['최근뉴스'] = news_list if news_list else ["최근 주요 뉴스가 없습니다."]
             
+            # 동일업종 비교 (경쟁사)
+            try:
+                tbl = soup.select_one('.trade_compare table')
+                if tbl:
+                    headers = [th.text.strip() for th in tbl.select('thead th')[1:]]
+                    rows = tbl.select('tbody tr')
+                    peers = []
+                    for i, h in enumerate(headers):
+                        if h and '*' in h:
+                            name = h.split('*')[0].strip()
+                            # 자기 자신은 제외하거나 포함 (여기서는 5개 모두 포함하여 비교)
+                            def get_val(keyword):
+                                for r in rows:
+                                    th_elem = r.select_one('th')
+                                    if th_elem and keyword in th_elem.text:
+                                        tds = r.select('td')
+                                        if len(tds) > i: return tds[i].text.strip()
+                                return 'N/A'
+                            price = get_val('현재가')
+                            per = get_val('PER(배)')
+                            pbr = get_val('PBR(배)')
+                            roe = get_val('ROE(%)')
+                            peers.append(f"- {name}: 현재가 {price}원 | PER {per} | PBR {pbr} | ROE {roe}%")
+                    if peers:
+                        data['동일업종비교'] = "\n".join(peers)
+            except Exception as e:
+                print("Peer parsing error:", e)
+            
         except Exception as e:
             print(f"Parsing error: {e}")
             
