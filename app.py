@@ -95,5 +95,14 @@ if st.button("AI 분석 시작하기", use_container_width=True, type="primary")
                 with st.container(border=True):
                     st.markdown(report)
                     
+                # Add a download button for the report
+                st.download_button(
+                    label="📥 분석 보고서 다운로드 (텍스트 파일)",
+                    data=report,
+                    file_name=f"{stock_name}_AI분석리포트.txt",
+                    mime="text/plain",
+                    use_container_width=True
+                )
+                    
             except Exception as e:
                 st.error(f"AI 분석 실패: {e}")
