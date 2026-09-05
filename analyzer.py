@@ -6,8 +6,8 @@ class StockAnalyzer:
     def __init__(self, api_key):
         # Initialize Gemini Client
         self.client = genai.Client(api_key=api_key)
-        # Use stable Gemini 2.0 Flash model
-        self.model_id = 'gemini-2.0-flash' 
+        # Use the latest 3.6 flash model
+        self.model_id = 'gemini-3.6-flash' 
 
     def analyze(self, stock_name, stock_data):
         prompt = f"""
