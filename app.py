@@ -52,9 +52,28 @@ if st.button("AI 분석 시작하기", use_container_width=True, type="primary")
     elif not stock_name:
         st.warning("종목명을 입력해주세요.")
     else:
-        ticker = ticker_dict.get(stock_name)
+        user_input = stock_name.strip()
+        ticker = None
+        
+        # 1. 6자리 종목코드를 직접 입력한 경우
+        if user_input.isdigit() and len(user_input) == 6:
+            ticker = user_input
+            # 원래 이름 찾기 (출력용)
+            for name, code in ticker_dict.items():
+                if code == ticker:
+                    stock_name = name
+                    break
+        # 2. 종목명으로 검색하는 경우 (대소문자, 띄어쓰기 무시)
+        else:
+            search_key = user_input.upper().replace(" ", "")
+            for name, code in ticker_dict.items():
+                if name.upper().replace(" ", "") == search_key:
+                    ticker = code
+                    stock_name = name # 정확한 공식 명칭으로 덮어쓰기
+                    break
+                    
         if not ticker:
-            st.error(f"'{stock_name}' 종목을 찾을 수 없습니다. 정확한 이름을 입력했는지 확인해주세요.")
+            st.error(f"'{user_input}' 종목을 찾을 수 없습니다. 정확한 이름이나 6자리 종목코드를 입력해주세요.")
             st.stop()
             
         st.success(f"종목 확인 완료: **{stock_name}** ({ticker})")
