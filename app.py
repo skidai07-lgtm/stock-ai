@@ -1,5 +1,6 @@
 import streamlit as st
 import os
+import json
 from dotenv import load_dotenv
 import FinanceDataReader as fdr
 from naver_api import NaverFinanceApi
@@ -34,17 +35,30 @@ with st.sidebar:
 # Cache ticker mapping to avoid slow lookup every time
 @st.cache_data(ttl=3600*24)
 def get_all_tickers():
-    mapping = {}
-    with st.spinner("최초 1회 주식 종목 코드를 불러오는 중입니다 (약 5초 소요)..."):
-        df_krx = fdr.StockListing('KRX')
-        for idx, row in df_krx.iterrows():
-            mapping[row['Name']] = row['Code']
-    return mapping
+    # 1. 로컬에 저장된 tickers.json 우선 로드 (네트워크 오류 100% 방지, 0.01초 로딩)
+    if os.path.exists("tickers.json"):
+        try:
+            with open("tickers.json", "r", encoding="utf-8") as f:
+                return json.load(f)
+        except Exception:
+            pass
+
+    # 2. 파일이 없을 경우 KIND 상장법인 목록에서 실시간 다운로드
+    try:
+        import requests, io, pandas as pd
+        url = 'http://kind.krx.co.kr/corpgeneral/corpList.do?method=download&searchType=13'
+        r = requests.get(url, headers={'User-Agent': 'Mozilla/5.0'}, timeout=5)
+        df = pd.read_html(io.StringIO(r.content.decode('cp949')), header=0)[0]
+        return {str(row['회사명']).strip(): str(row['종목코드']).strip().zfill(6) for _, row in df.iterrows()}
+    except Exception:
+        pass
+
+    return {}
 
 ticker_dict = get_all_tickers()
 
 st.markdown("---")
-stock_name = st.text_input("🔎 분석할 종목명을 입력하세요 (예: 삼성전자, 카카오)")
+stock_name = st.text_input("🔎 분석할 종목명을 입력하세요 (예: 삼성전자, SK이터닉스, 또는 6자리 종목코드)")
 
 if st.button("AI 분석 시작하기", use_container_width=True, type="primary"):
     if not gemini_api_key:
@@ -58,22 +72,29 @@ if st.button("AI 분석 시작하기", use_container_width=True, type="primary")
         # 1. 6자리 종목코드를 직접 입력한 경우
         if user_input.isdigit() and len(user_input) == 6:
             ticker = user_input
-            # 원래 이름 찾기 (출력용)
             for name, code in ticker_dict.items():
                 if code == ticker:
                     stock_name = name
                     break
-        # 2. 종목명으로 검색하는 경우 (대소문자, 띄어쓰기 무시)
+        # 2. 종목명으로 검색하는 경우 (대소문자, 띄어쓰기 무시 및 부분 일치 탐색)
         else:
             search_key = user_input.upper().replace(" ", "")
+            # 완전 일치 먼저 검색
             for name, code in ticker_dict.items():
                 if name.upper().replace(" ", "") == search_key:
                     ticker = code
-                    stock_name = name # 정확한 공식 명칭으로 덮어쓰기
+                    stock_name = name
                     break
+            # 부분 일치 검색 (예: '이터닉스' -> 'SK이터닉스')
+            if not ticker:
+                for name, code in ticker_dict.items():
+                    if search_key in name.upper().replace(" ", ""):
+                        ticker = code
+                        stock_name = name
+                        break
                     
         if not ticker:
-            st.error(f"'{user_input}' 종목을 찾을 수 없습니다. 정확한 이름이나 6자리 종목코드를 입력해주세요.")
+            st.error(f"'{user_input}' 종목을 찾을 수 없습니다. 정확한 이름이나 6자리 종목코드(예: 475150)를 입력해주세요.")
             st.stop()
             
         st.success(f"종목 확인 완료: **{stock_name}** ({ticker})")
