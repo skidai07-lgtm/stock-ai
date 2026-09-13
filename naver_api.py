@@ -1,92 +1,110 @@
 import requests
-from bs4 import BeautifulSoup
 
 class NaverFinanceApi:
-    def get_stock_data(self, ticker):
-        url = f"https://finance.naver.com/item/main.naver?code={ticker}"
-        headers = {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko)"
+    def __init__(self):
+        self.headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
         }
-        res = requests.get(url, headers=headers)
-        if res.status_code != 200:
-            raise Exception(f"Failed to fetch data from Naver Finance (Status: {res.status_code})")
-            
-        soup = BeautifulSoup(res.text, 'html.parser')
-        data = {}
-        
-        try:
-            # 기본 가격 및 시가총액
-            price_div = soup.select_one('.no_today .blind')
-            if price_div: data['현재가'] = price_div.text.replace(',', '')
-            
-            market_cap_em = soup.select_one('#_market_sum')
-            if market_cap_em: data['시가총액'] = market_cap_em.text.replace(',', '').strip()
-                
-            # 펀더멘털 (PER, EPS, PBR, BPS)
-            per_em = soup.select_one('#_per')
-            if per_em: data['PER'] = per_em.text
-            
-            eps_em = soup.select_one('#_eps')
-            if eps_em: data['EPS'] = eps_em.text.replace(',', '')
-            
-            pbr_em = soup.select_one('#_pbr')
-            if pbr_em: data['PBR'] = pbr_em.text
-            
-            # 외국인 지분율
-            foreign_ratio = soup.select_one('.lwidth tbody tr:nth-of-type(3) td em')
-            if foreign_ratio: data['외국인소진율'] = foreign_ratio.text
-            
-            # 52주 최고/최저
-            high52 = soup.select_one('.rwidth tbody tr:nth-of-type(2) td em:nth-of-type(1)')
-            low52 = soup.select_one('.rwidth tbody tr:nth-of-type(2) td em:nth-of-type(2)')
-            if high52 and low52: data['52주최고최저'] = f"{high52.text} / {low52.text}"
-            
-            # 동일업종 PER (경쟁사 대비 고평가/저평가 판단용)
-            industry_per = soup.select_one('table.summary_info tr:nth-of-type(6) td em')
-            if not industry_per:
-                industry_per = soup.select_one('#_cmp_per')
-            if industry_per: data['동일업종PER'] = industry_per.text
-            
-            # 배당수익률
-            div_em = soup.select_one('#_dvr')
-            if div_em: data['배당수익률'] = div_em.text
 
-            # 최근 뉴스 헤드라인 추출 (수주, 호재, 악재 파악용)
-            news_list = []
-            news_tags = soup.select('.news_section ul.spt_con li a.tit')
-            for tag in news_tags[:5]: # 최대 5개까지만
-                news_list.append(tag.text.strip())
-            data['최근뉴스'] = news_list if news_list else ["최근 주요 뉴스가 없습니다."]
-            
-            # 동일업종 비교 (경쟁사)
-            try:
-                tbl = soup.select_one('.trade_compare table')
-                if tbl:
-                    headers = [th.text.strip() for th in tbl.select('thead th')[1:]]
-                    rows = tbl.select('tbody tr')
-                    peers = []
-                    for i, h in enumerate(headers):
-                        if h and '*' in h:
-                            name = h.split('*')[0].strip()
-                            # 자기 자신은 제외하거나 포함 (여기서는 5개 모두 포함하여 비교)
-                            def get_val(keyword):
-                                for r in rows:
-                                    th_elem = r.select_one('th')
-                                    if th_elem and keyword in th_elem.text:
-                                        tds = r.select('td')
-                                        if len(tds) > i: return tds[i].text.strip()
-                                return 'N/A'
-                            price = get_val('현재가')
-                            per = get_val('PER(배)')
-                            pbr = get_val('PBR(배)')
-                            roe = get_val('ROE(%)')
-                            peers.append(f"- {name}: 현재가 {price}원 | PER {per} | PBR {pbr} | ROE {roe}%")
-                    if peers:
-                        data['동일업종비교'] = "\n".join(peers)
-            except Exception as e:
-                print("Peer parsing error:", e)
-            
+    def get_stock_data(self, ticker):
+        data = {}
+
+        # 1. 기본 시세, 밸류에이션, 수급 데이터 (Integration API)
+        try:
+            url = f"https://m.stock.naver.com/api/stock/{ticker}/integration"
+            r = requests.get(url, headers=self.headers, timeout=6)
+            if r.status_code == 200:
+                d = r.json()
+                for info in d.get("totalInfos", []):
+                    code = info.get("code")
+                    val = str(info.get("value", "N/A")).replace("배", "").replace("원", "").strip()
+                    if code == "lastClosePrice": data["현재가"] = val
+                    elif code == "marketValue": data["시가총액"] = val
+                    elif code == "foreignRate": data["외국인소진율"] = val
+                    elif code == "highPriceOf52Weeks": data["52주최고"] = val
+                    elif code == "lowPriceOf52Weeks": data["52주최저"] = val
+                    elif code == "per": data["PER"] = val
+                    elif code == "pbr": data["PBR"] = val
+                    elif code == "eps": data["EPS"] = val
+                    elif code == "bps": data["BPS"] = val
+                    elif code == "dividendYieldRatio": data["배당수익률"] = val
+                    elif code == "cnsPer": data["추정PER"] = val
+                    elif code == "cnsEps": data["추정EPS"] = val
+
+                high = data.get("52주최고", "N/A")
+                low = data.get("52주최저", "N/A")
+                data["52주최고최저"] = f"{high} / {low}"
+
+                # 증권사 목표주가 및 투자의견 컨센서스
+                cns = d.get("consensusInfo")
+                if cns:
+                    target_price = cns.get("targetPrice", "N/A")
+                    opinion = cns.get("consensusName", "N/A")
+                    data["목표주가"] = f"{target_price}원 (투자의견: {opinion})"
+
+                # 동일업종 경쟁사 비교
+                peers = d.get("industryCompareInfo", [])
+                peer_list = []
+                for p in peers[:4]:
+                    p_name = p.get("stockName")
+                    p_price = p.get("closePrice")
+                    p_fluc = p.get("fluctuationsRatio")
+                    peer_list.append(f"- {p_name}: 현재가 {p_price}원 (등락률: {p_fluc}%)")
+                if peer_list:
+                    data["동일업종비교"] = "\n".join(peer_list)
         except Exception as e:
-            print(f"Parsing error: {e}")
-            
+            print("Integration API error:", e)
+
+        # 2. 연간 재무제표 (매출액, 영업이익, 순이익, ROE, 부채비율, 당좌비율, 유보율 등)
+        try:
+            url = f"https://m.stock.naver.com/api/stock/{ticker}/finance/annual"
+            r = requests.get(url, headers=self.headers, timeout=6)
+            if r.status_code == 200:
+                fin_info = r.json().get("financeInfo", {})
+                titles = [t.get("title") for t in fin_info.get("trTitleList", [])]
+                keys = [t.get("key") for t in fin_info.get("trTitleList", [])]
+
+                lines = ["[기준년도 | " + " | ".join(titles) + "]"]
+                for row in fin_info.get("rowList", []):
+                    r_title = row.get("title")
+                    vals = [str(row.get("columns", {}).get(k, {}).get("value", "-")) for k in keys]
+                    lines.append(f"- {r_title}: " + " | ".join(vals))
+                data["연간재무제표"] = "\n".join(lines)
+        except Exception as e:
+            print("Annual finance API error:", e)
+
+        # 3. 최근 분기 재무제표
+        try:
+            url = f"https://m.stock.naver.com/api/stock/{ticker}/finance/quarter"
+            r = requests.get(url, headers=self.headers, timeout=6)
+            if r.status_code == 200:
+                fin_info = r.json().get("financeInfo", {})
+                titles = [t.get("title") for t in fin_info.get("trTitleList", [])]
+                keys = [t.get("key") for t in fin_info.get("trTitleList", [])]
+
+                lines = ["[기준분기 | " + " | ".join(titles) + "]"]
+                for row in fin_info.get("rowList", []):
+                    r_title = row.get("title")
+                    vals = [str(row.get("columns", {}).get(k, {}).get("value", "-")) for k in keys]
+                    lines.append(f"- {r_title}: " + " | ".join(vals))
+                data["분기재무제표"] = "\n".join(lines)
+        except Exception as e:
+            print("Quarter finance API error:", e)
+
+        # 4. 최근 뉴스 5개
+        try:
+            url = f"https://m.stock.naver.com/api/news/stock/{ticker}?page=1&pageSize=5"
+            r = requests.get(url, headers=self.headers, timeout=6)
+            if r.status_code == 200:
+                res_json = r.json()
+                if isinstance(res_json, list) and len(res_json) > 0:
+                    items = res_json[0].get("items", [])
+                    news_titles = [item.get("titleFull") or item.get("title") for item in items[:5]]
+                    data["최근뉴스"] = news_titles if news_titles else ["최근 뉴스가 없습니다."]
+        except Exception as e:
+            print("News API error:", e)
+
+        if "최근뉴스" not in data:
+            data["최근뉴스"] = ["최근 뉴스가 없습니다."]
+
         return data

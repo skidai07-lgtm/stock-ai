@@ -105,19 +105,37 @@ if st.button("AI 분석 시작하기", use_container_width=True, type="primary")
                 stock_data = naver_api.get_stock_data(ticker)
                 
                 # Display metrics nicely in cards
-                st.subheader("📊 핵심 재무 지표")
-                cols = st.columns(4)
+                st.subheader("📊 핵심 투자 및 재무 지표")
                 
                 # Helper function to format numbers safely
                 def format_num(val):
                     if not val or val == 'N/A': return 'N/A'
-                    try: return f"{int(float(val)):,}"
-                    except: return str(val)
-                
-                cols[0].metric("현재가", f"{format_num(stock_data.get('현재가', 0))} 원")
-                cols[1].metric("PER", stock_data.get('PER', 'N/A'))
-                cols[2].metric("PBR", stock_data.get('PBR', 'N/A'))
-                cols[3].metric("EPS", f"{format_num(stock_data.get('EPS', 0))} 원")
+                    try:
+                        clean_val = str(val).replace(',', '').strip()
+                        return f"{int(float(clean_val)):,}"
+                    except:
+                        return str(val)
+
+                cols1 = st.columns(4)
+                cols1[0].metric("현재가", f"{format_num(stock_data.get('현재가', 0))} 원")
+                cols1[1].metric("PER", f"{stock_data.get('PER', 'N/A')} 배" if stock_data.get('PER') != 'N/A' else 'N/A')
+                cols1[2].metric("PBR", f"{stock_data.get('PBR', 'N/A')} 배" if stock_data.get('PBR') != 'N/A' else 'N/A')
+                cols1[3].metric("EPS", f"{format_num(stock_data.get('EPS', 0))} 원")
+
+                cols2 = st.columns(4)
+                cols2[0].metric("시가총액", str(stock_data.get('시가총액', 'N/A')))
+                cols2[1].metric("외국인 지분율", str(stock_data.get('외국인소진율', 'N/A')))
+                cols2[2].metric("배당수익률", str(stock_data.get('배당수익률', 'N/A')))
+                cols2[3].metric("52주 최고/최저", str(stock_data.get('52주최고최저', 'N/A')))
+
+                # 재무제표 데이터 펼쳐보기
+                if stock_data.get("연간재무제표"):
+                    with st.expander("📋 [상세] 최근 4개년 연간 기업실적 및 재무건전성 데이터 보기"):
+                        st.code(stock_data.get("연간재무제표"), language="text")
+
+                if stock_data.get("분기재무제표"):
+                    with st.expander("📋 [상세] 최근 분기별 기업실적 데이터 보기"):
+                        st.code(stock_data.get("분기재무제표"), language="text")
                 
             except Exception as e:
                 st.error(f"데이터 연동 실패: {e}")
