@@ -61,31 +61,29 @@ class StockAnalyzer:
 
 ### 7. 🏆 최종 종합 등급 및 총평 (A ~ F)
 - **최종 투자 매력도 등급**: [ A / B / C / D / E / F ] 중 하나 부여
-- **핵심 이유 요약**: 등급 부여 이유를 명확하게 2~3줄로 총평
+- **핵심 이유 요약**: 등급 부여 이유를 명확하게 2줄로 총평
+
+(주의: 불필요한 서론/결론은 생략하고, 각 항목별로 핵심만 2~3줄의 불릿포인트로 신속하고 명확하게 작성해주세요.)
 """
 
         import time
 
-        models_to_try = [self.model_id, 'gemini-2.5-flash']
         last_error = None
-
-        for model in models_to_try:
-            for attempt in range(3):
-                try:
-                    response = self.client.models.generate_content(
-                        model=model,
-                        contents=prompt,
-                    )
-                    if response and response.text:
-                        return response.text
-                except Exception as e:
-                    last_error = e
-                    err_str = str(e)
-                    # 503 과부하 또는 429 요청 폭주시 2초 대기 후 자동 재시도
-                    if '503' in err_str or 'UNAVAILABLE' in err_str or '429' in err_str or 'high demand' in err_str:
-                        time.sleep(2)
-                        continue
-                    else:
-                        break  # 다른 종류의 오류면 즉시 다음 모델 시도
+        for attempt in range(2):
+            try:
+                response = self.client.models.generate_content(
+                    model=self.model_id,
+                    contents=prompt,
+                )
+                if response and response.text:
+                    return response.text
+            except Exception as e:
+                last_error = e
+                err_str = str(e)
+                if '503' in err_str or 'UNAVAILABLE' in err_str or '429' in err_str or 'high demand' in err_str:
+                    time.sleep(1)
+                    continue
+                else:
+                    raise e
 
         raise last_error

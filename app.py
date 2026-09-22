@@ -141,16 +141,23 @@ if st.button("AI 분석 시작하기", use_container_width=True, type="primary")
                 st.error(f"데이터 연동 실패: {e}")
                 st.stop()
                 
-        with st.spinner("최근 1년 주가 차트 생성 중..."):
-            try:
-                import datetime
-                start_date = (datetime.datetime.now() - datetime.timedelta(days=365)).strftime('%Y-%m-%d')
-                df_chart = fdr.DataReader(ticker, start_date)
-                if not df_chart.empty:
-                    st.subheader("📉 최근 1년 주가 흐름")
-                    st.line_chart(df_chart['Close'], use_container_width=True)
-            except Exception as e:
-                pass # 차트 실패시 그냥 넘어감
+        # 최근 주가 차트 (0.2초 초고속 생성)
+        try:
+            import xml.etree.ElementTree as ET
+            import pandas as pd
+            chart_url = f"https://fchart.stock.naver.com/sise.nhn?symbol={ticker}&timeframe=day&count=120&requestType=0"
+            r_chart = requests.get(chart_url, headers={"User-Agent": "Mozilla/5.0"}, timeout=3)
+            root = ET.fromstring(r_chart.text)
+            items = [item.attrib["data"].split("|") for item in root.findall(".//item")]
+            if items:
+                df_chart = pd.DataFrame(items, columns=["Date", "Open", "High", "Low", "Close", "Volume"])
+                df_chart["Close"] = pd.to_numeric(df_chart["Close"])
+                df_chart["Date"] = pd.to_datetime(df_chart["Date"])
+                df_chart.set_index("Date", inplace=True)
+                st.subheader("📉 최근 6개월 주가 흐름")
+                st.line_chart(df_chart["Close"], use_container_width=True)
+        except Exception:
+            pass
                 
         with st.spinner("AI(Gemini)가 업황과 해외매출 가능성 등을 분석 중입니다... (10~20초 소요)"):
             try:
