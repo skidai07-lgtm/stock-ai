@@ -6,8 +6,8 @@ class StockAnalyzer:
     def __init__(self, api_key):
         # Initialize Gemini Client
         self.client = genai.Client(api_key=api_key)
-        # Use the latest 3.6 flash model
-        self.model_id = 'gemini-3.6-flash' 
+        # Primary workhorse model
+        self.model_id = 'gemini-3.8-flash' 
 
     def analyze(self, stock_name, stock_data):
         news_text = "\n".join(stock_data.get('최근뉴스', []))
@@ -66,24 +66,26 @@ class StockAnalyzer:
 (주의: 불필요한 서론/결론은 생략하고, 각 항목별로 핵심만 2~3줄의 불릿포인트로 신속하고 명확하게 작성해주세요.)
 """
 
-        import time
-
+        # 503 트래픽 과부하 방지를 위한 다중 모델 자동 우회(Failover) 목록
+        models_to_try = [
+            'gemini-3.8-flash',
+            'gemini-3.7-flash',
+            'gemini-3.5-flash',
+            'gemini-2.5-flash'
+        ]
         last_error = None
-        for attempt in range(2):
+
+        for model_name in models_to_try:
             try:
                 response = self.client.models.generate_content(
-                    model=self.model_id,
+                    model=model_name,
                     contents=prompt,
                 )
                 if response and response.text:
                     return response.text
             except Exception as e:
                 last_error = e
-                err_str = str(e)
-                if '503' in err_str or 'UNAVAILABLE' in err_str or '429' in err_str or 'high demand' in err_str:
-                    time.sleep(1)
-                    continue
-                else:
-                    raise e
+                # 특정 모델이 과부하(503)이거나 제한(429)이면 다음 모델로 즉시 자동 전환!
+                continue
 
         raise last_error
